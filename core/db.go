@@ -44,13 +44,13 @@ func Open(path, key string) (*Database, error) {
 		return nil, errors.New("database key is required")
 	}
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		return nil, err
 	}
 
 	safetyPath := path + ".safety"
-	sFile, err := os.OpenFile(safetyPath, os.O_RDWR|os.O_CREATE, 0666)
+	sFile, err := os.OpenFile(safetyPath, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		file.Close()
 		return nil, err

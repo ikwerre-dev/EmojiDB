@@ -34,7 +34,6 @@ func TestQuery(t *testing.T) {
 	db.Insert("users", core.Row{"id": 1, "name": "alice", "age": 30})
 	db.Insert("users", core.Row{"id": 2, "name": "bob", "age": 25})
 
-	// Safety backup for inserts (calling it manually for now as requested)
 	if err := safety.BackupForSafety(db, "users", core.Row{"id": 1, "name": "alice", "age": 30}); err != nil {
 		t.Fatalf("backup failed: %v", err)
 	}
