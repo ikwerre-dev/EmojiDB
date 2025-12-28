@@ -224,54 +224,43 @@ func (db *Database) SyncSchema(tableName string, newFields []Field, force bool) 
 		}
 		table.UniqueIndices = indices
 
-		// HELPER: Validate and Filter Rows
 		filterRows := func(rows []Row) []Row {
 			var valid []Row
 			for _, row := range rows {
 				keep := true
-				// Check types
+				prunedRow := make(Row)
+
 				for _, f := range newFields {
 					val, exists := row[f.Name]
 					if exists {
-						// Simple type check (in production this would be more robust)
-						// For now, if type mismatches significantly, we drop?
-						// Or we trust the Go type assertion/check?
-						// Let's check Unique constraints here too?
 						if f.Unique {
-							// For unique, we need to populate indices.
-							// If duplicate, we drop.
 							if _, seen := indices[f.Name][val]; seen {
 								keep = false
 								break
 							}
 							indices[f.Name][val] = struct{}{}
 						}
+						prunedRow[f.Name] = val
 					}
 				}
+
 				if keep {
-					valid = append(valid, row)
+					valid = append(valid, prunedRow)
 				}
 			}
 			return valid
 		}
 
-		// 1. Filter Sealed Clumps
-		// We need to re-process all clumps because unique indices must be global
-		// To do this correctly for "Force", we should probably flatten, filter, and re-clump?
-		// Or just filter in place.
-		// Since we reset indices above, we just iterate.
 		for _, clump := range table.SealedClumps {
 			clump.Rows = filterRows(clump.Rows)
-			clump.Metadata.RowCount = len(clump.Rows) // Update metadata
+			clump.Metadata.RowCount = len(clump.Rows)
 		}
 
-		// 2. Filter Hot Heap
 		table.HotHeap.Rows = filterRows(table.HotHeap.Rows)
 	}
 	db.Mu.Unlock()
 
 	if force {
-		// Validated and filtered in memory. Now enforce on disk.
 		return db.Rewrite()
 	}
 
@@ -321,13 +310,9 @@ func (db *Database) DropTable(tableName string) error {
 	delete(db.Tables, tableName)
 	db.Mu.Unlock()
 
-	// Persist schema change
 	if err := db.SaveSchemas(); err != nil {
 		return err
 	}
-	// Rewriting file to remove data is expensive but correct for "Drop".
-	// For MVP, user wants "Count and others".
-	// Let's do Rewrite to be clean.
 	return db.Rewrite()
 }
 
@@ -335,7 +320,6 @@ func (db *Database) Rewrite() error {
 	db.Mu.Lock()
 	defer db.Mu.Unlock()
 
-	// 1. Truncate
 	if err := db.File.Truncate(0); err != nil {
 		return err
 	}
@@ -343,18 +327,16 @@ func (db *Database) Rewrite() error {
 		return err
 	}
 
-	// 2. Header
 	if err := storage.WriteHeader(db.File); err != nil {
 		return err
 	}
 
-	// 3. Persist all tables
 	for tableName, table := range db.Tables {
 		table.Mu.RLock()
 		for _, clump := range table.SealedClumps {
 			if len(clump.Rows) == 0 {
 				continue
-			} // Skip empty clumps from filtering
+			}
 			if err := storage.InternalPersistClump(db.File, tableName, clump, db.Key, crypto.Encrypt, crypto.EncodeToEmojis); err != nil {
 				table.Mu.RUnlock()
 				return err
@@ -602,6 +584,16 @@ func (db *Database) Flush(tableName string) error {
 	return storage.PersistClump(db.File, &db.Mu, tableName, clump, db.Key, crypto.Encrypt, crypto.EncodeToEmojis)
 }
 
+func (db *Database) ListTables() []string {
+	db.Mu.RLock()
+	defer db.Mu.RUnlock()
+	tables := make([]string, 0, len(db.Tables))
+	for name := range db.Tables {
+		tables = append(tables, name)
+	}
+	return tables
+}
+
 func (db *Database) DumpAsJSON(tableName string) (string, error) {
 	db.Mu.RLock()
 	table, ok := db.Tables[tableName]
@@ -716,7 +708,6 @@ func (db *Database) StartAutoFlush(interval time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				// Identify dirty tables
 				var dirtyTables []string
 				db.Mu.RLock()
 				for name, table := range db.Tables {
@@ -728,9 +719,7 @@ func (db *Database) StartAutoFlush(interval time.Duration) {
 				}
 				db.Mu.RUnlock()
 
-				// Flush them
 				for _, name := range dirtyTables {
-					// We ignore errors in auto-flush loop to keep going
 					_ = db.Flush(name)
 				}
 			case <-db.stopFlush:
@@ -741,13 +730,11 @@ func (db *Database) StartAutoFlush(interval time.Duration) {
 }
 
 func (db *Database) Close() error {
-	// Stop auto-flusher if running
 	if db.stopFlush != nil {
 		close(db.stopFlush)
 		db.stopFlush = nil
 	}
 
-	// 1. Force Flush All Tables
 	db.Mu.RLock()
 	tableNames := make([]string, 0, len(db.Tables))
 	for name := range db.Tables {

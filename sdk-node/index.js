@@ -9,7 +9,6 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Custom Error for cleaner structured errors
 export class EmojiDBError extends Error {
     constructor(message, originalStack) {
         super(message);
@@ -17,7 +16,6 @@ export class EmojiDBError extends Error {
         this.code = 'UNKNOWN_ERROR';
         this.details = {};
 
-        // Parse Known Go Errors
         if (message.includes('table not found:')) {
             this.code = 'TABLE_NOT_FOUND';
             this.details = { table: message.split(': ')[1] };
@@ -29,22 +27,15 @@ export class EmojiDBError extends Error {
             this.details = { field: message.split(': ')[1] };
         } else if (message.includes('type mismatch')) {
             this.code = 'TYPE_MISMATCH';
-            // "type mismatch for field: name" -> name
             const parts = message.split(': ');
             if (parts.length > 1) this.details = { field: parts[1] };
         }
 
-        // Hide the stack trace from default console.log if requested
-        // by overriding inspect custom or just keeping it clean.
-        // We stitch the stack for debugging if needed, but the user wants "direct error in json".
-
         if (originalStack) {
-            // We keep the stack for debugging but maybe we don't show it by default
             this.stack = `${this.name} [${this.code}]: ${this.message}\n${originalStack.substring(originalStack.indexOf('\n') + 1)}`;
         }
     }
 
-    // This method is called by Node.js console.log()
     [Symbol.for('nodejs.util.inspect.custom')](depth, options) {
         return {
             error: this.name,
@@ -54,7 +45,6 @@ export class EmojiDBError extends Error {
         };
     }
 
-    // For JSON.stringify(err)
     toJSON() {
         return {
             error: this.name,
@@ -79,7 +69,6 @@ export class BinaryManager {
             const file = fs.createWriteStream(dest);
             const request = (requestUrl) => {
                 https.get(requestUrl, (response) => {
-                    // Handle All Redirects (301, 302, 307, 308)
                     if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location) {
                         request(response.headers.location);
                         return;
@@ -192,7 +181,6 @@ class EmojiDB {
 
     async send(method, params = {}) {
         const id = Math.random().toString(36).substring(7);
-        // Capture stack trace at the call site (sync)
         const stackContainer = {};
         Error.captureStackTrace(stackContainer);
 
@@ -237,17 +225,14 @@ class EmojiDB {
             force = fieldsOrForce;
         }
 
-        // Case 3: Explicit Migration (table + fields provided)
         if (table && fields) {
             return this.send('sync_schema', { table, fields, force });
         }
 
-        // Case 1 & 2: File-Based Migration
         if (!this.dbPath) {
             throw new Error("Database not open. Call open() first.");
         }
 
-        // Construct path: emojidb/[basename].schema.json
         const baseName = path.basename(this.dbPath);
         const schemaPath = path.join('emojidb', baseName + '.schema.json');
 
@@ -263,29 +248,48 @@ class EmojiDB {
             throw new Error(`Failed to parse schema file: ${e.message}`);
         }
 
-        // Case 2: Migrate Single Table from File
         if (table) {
             if (!schema[table]) {
                 throw new Error(`Table '${table}' not defined in schema file.`);
             }
             return this.send('sync_schema', { table, fields: schema[table].Fields, force });
         }
+        const schemaTables = Object.keys(schema);
+        if (schemaTables.length === 0) return "No tables to migrate.";
 
-        // Case 1: Migrate All Tables from File
-        const tables = Object.keys(schema);
-        if (tables.length === 0) return "No tables to migrate.";
+        let dropped = [];
+        try {
+            const currentTables = await this.listTables();
+            const toDrop = currentTables.filter(t => !schema[t]);
+
+            for (const t of toDrop) {
+                console.log(`✂️ EmojiDB Pruning: Table '${t}' omitted from schema. Dropping...`);
+                await this.dropTable(t);
+                dropped.push(t);
+            }
+        } catch (err) {
+            console.warn("⚠️ Pruning check failed (ignoring):", err.message);
+        }
 
         const results = [];
-        for (const t of tables) {
+        for (const t of schemaTables) {
             // We run them sequentially to be safe
             await this.send('sync_schema', { table: t, fields: schema[t].Fields, force });
-            results.push(t);
         }
-        return `Migrated ${results.length} tables: ${results.join(', ')}`;
+
+        let msg = `Migrated ${results.length} tables: ${results.join(', ')}`;
+        if (dropped.length > 0) {
+            msg += `. Pruned ${dropped.length} tables: ${dropped.join(', ')}`;
+        }
+        return msg;
     }
 
     async pull() {
         return this.send('pull_schema');
+    }
+
+    async listTables() {
+        return this.send('list_tables');
     }
 
     async count(table, match = {}) {

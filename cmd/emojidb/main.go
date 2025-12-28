@@ -53,9 +53,6 @@ func handle(req Request) {
 		if err != nil {
 			sendError(req.ID, err.Error())
 		} else {
-			// Auto-Flush Strategy:
-			// Check for dirty data every 1 second.
-			// This is lightweight (memory check) and only writes if needed.
 			db.StartAutoFlush(1 * time.Second)
 			sendSuccess(req.ID, "opened")
 		}
@@ -139,6 +136,14 @@ func handle(req Request) {
 		} else {
 			sendSuccess(req.ID, "pulled")
 		}
+
+	case "list_tables":
+		if db == nil {
+			sendError(req.ID, "db not open")
+			return
+		}
+		tables := db.ListTables()
+		sendSuccess(req.ID, tables)
 
 	case "insert":
 		var p struct {

@@ -106,6 +106,11 @@ export default class EmojiDB {
     pull(): Promise<string>;
 
     /**
+     * Lists all tables currently in the database.
+     */
+    listTables(): Promise<string[]>;
+
+    /**
      * Queries a table for rows matching the criteria.
      * @param table Name of the table.
      * @param match (Optional) Filter object to match rows.

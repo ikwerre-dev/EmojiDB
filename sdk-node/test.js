@@ -75,8 +75,31 @@ async function runTest() {
         await db.flush('users');
         console.log('✅ Data flushed to disk successfully.');
 
+        // 8. Test List Tables & Pruning
+        console.log('9. Testing List Tables & Column Pruning...');
+        const tables = await db.listTables();
+        console.log('   Current Tables:', tables);
+        if (tables.includes('users')) {
+            console.log('✅ listTables() verified.');
+        } else {
+            console.log('❌ listTables() failed.');
+        }
+
+        // 9. Column Pruning Test
+        // Reset schema to just 'id' (dropping 'username')
+        console.log('   Pruning "username" column...');
+        await db.migrate('users', [{ Name: 'id', Type: 0, Unique: true }], true); // Force = true
+
+        const prunedResults = await db.query('users', { id: 101 });
+        // Result should NOT have username
+        if (prunedResults[0].username === undefined) {
+            console.log('✅ Column Pruning verified: "username" is gone.');
+        } else {
+            console.log('❌ Column Pruning failed: "username" still exists.', prunedResults[0]);
+        }
+
         await db.close();
-        console.log('9. Connection Closed');
+        console.log('10. Connection Closed');
 
     } catch (err) {
         console.error('❌ TEST ERROR:', err.message);
