@@ -89,34 +89,78 @@ func TestFullShowcase(t *testing.T) {
 		took time.Duration
 	}{"Ingest 1500 Rows", time.Since(start)})
 
-	// 4. Safety Engine (Update & Backup)
+	// 4. Bulk Update (50 records)
 	start = time.Now()
-	fmt.Println("4. Safety Engine: Updating Product 1 price (Automatic Backup)")
+	fmt.Println("4. Safety Engine: Bulk Updating 50 records")
 	err = safety.Update(db, "products", func(r core.Row) bool {
 		id, ok := r["id"].(int)
-		return ok && id == 1
-	}, core.Row{"price": 99})
-
+		return ok && id >= 100 && id < 150
+	}, core.Row{"category": "updated_bulk"})
 	if err != nil {
-		t.Fatalf("Update failed: %v", err)
+		t.Fatalf("Bulk update failed: %v", err)
 	}
 	timings = append(timings, struct {
 		name string
 		took time.Duration
-	}{"Safety Update", time.Since(start)})
+	}{"Bulk Update (50)", time.Since(start)})
 
-	// 5. Persistence (Flush)
+	// 5. Single Updates (5 records)
 	start = time.Now()
-	fmt.Println("5. Flushing Hot Heap to Disk (Total Emoji Encoding)")
+	fmt.Println("5. Safety Engine: Single Updating 5 records")
+	for i := 200; i < 205; i++ {
+		targetID := i
+		safety.Update(db, "products", func(r core.Row) bool {
+			id, _ := r["id"].(int)
+			return id == targetID
+		}, core.Row{"name": "Updated Single"})
+	}
+	timings = append(timings, struct {
+		name string
+		took time.Duration
+	}{"Single Update (5)", time.Since(start)})
+
+	// 6. Bulk Delete (50 records)
+	start = time.Now()
+	fmt.Println("6. Safety Engine: Bulk Deleting 50 records")
+	err = safety.Delete(db, "products", func(r core.Row) bool {
+		id, ok := r["id"].(int)
+		return ok && id >= 300 && id < 350
+	})
+	if err != nil {
+		t.Fatalf("Bulk delete failed: %v", err)
+	}
+	timings = append(timings, struct {
+		name string
+		took time.Duration
+	}{"Bulk Delete (50)", time.Since(start)})
+
+	// 7. Single Deletes (5 records)
+	start = time.Now()
+	fmt.Println("7. Safety Engine: Single Deleting 5 records")
+	for i := 400; i < 405; i++ {
+		targetID := i
+		safety.Delete(db, "products", func(r core.Row) bool {
+			id, _ := r["id"].(int)
+			return id == targetID
+		})
+	}
+	timings = append(timings, struct {
+		name string
+		took time.Duration
+	}{"Single Delete (5)", time.Since(start)})
+
+	// 8. Persistence (Flush)
+	start = time.Now()
+	fmt.Println("8. Flushing Hot Heap to Disk (Total Emoji Encoding)")
 	db.Flush("products")
 	timings = append(timings, struct {
 		name string
 		took time.Duration
 	}{"Flush to Disk", time.Since(start)})
 
-	// 6. Inspect File
+	// 9. Inspect File
 	start = time.Now()
-	fmt.Println("6. Inspecting Disk Content (Should be 100% Emojis)")
+	fmt.Println("9. Inspecting Disk Content (Should be 100% Emojis)")
 	content, _ := os.ReadFile(dbPath)
 	if len(content) > 60 {
 		fmt.Printf("   Preview: %s...\n", string(content[:60]))
@@ -128,13 +172,12 @@ func TestFullShowcase(t *testing.T) {
 		took time.Duration
 	}{"Inspect File", time.Since(start)})
 
-	// 7. Query Engine
+	// 10. Query Engine
 	start = time.Now()
-	fmt.Println("7. Running Fluent Query: Category = 'tech' && Price < 100")
+	fmt.Println("10. Running Fluent Query: Category = 'updated_bulk'")
 	results, err := query.NewQuery(db, "products").Filter(func(r core.Row) bool {
 		cat, _ := r["category"].(string)
-		price, _ := r["price"].(int)
-		return cat == "tech" && price < 100
+		return cat == "updated_bulk"
 	}).Execute()
 
 	if err != nil {
@@ -146,9 +189,9 @@ func TestFullShowcase(t *testing.T) {
 		took time.Duration
 	}{"Execute Query", time.Since(start)})
 
-	// 8. JSON Dump to File
+	// 11. JSON Dump to File
 	start = time.Now()
-	fmt.Println("8. Dumping Table to dump.json")
+	fmt.Println("11. Dumping Table to dump.json")
 	jsonDump, err := db.DumpAsJSON("products")
 	if err != nil {
 		t.Fatalf("Dump failed: %v", err)
