@@ -167,6 +167,23 @@ func handle(req Request) {
 			sendSuccess(req.ID, "deleted")
 		}
 
+	case "batch_insert":
+		var p struct {
+			Table   string     `json:"table"`
+			Records []core.Row `json:"records"`
+		}
+		json.Unmarshal(req.Params, &p)
+		if db == nil {
+			sendError(req.ID, "db not open")
+			return
+		}
+		err := db.BulkInsert(p.Table, p.Records)
+		if err != nil {
+			sendError(req.ID, err.Error())
+		} else {
+			sendSuccess(req.ID, "inserted")
+		}
+
 	case "query":
 		var p struct {
 			Table string `json:"table"`

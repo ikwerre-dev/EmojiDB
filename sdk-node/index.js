@@ -219,6 +219,10 @@ class EmojiDB {
         return this.send('insert', { table, row });
     }
 
+    async batchInsert(table, rows) {
+        return this.send('batch_insert', { table, records: rows });
+    }
+
     async query(table, match = {}) {
         return this.send('query', { table, match });
     }

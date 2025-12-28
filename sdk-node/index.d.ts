@@ -54,6 +54,13 @@ export default class EmojiDB {
     insert(table: string, row: Record<string, any>): Promise<string>;
 
     /**
+     * Inserts multiple rows into a table in a single atomic batch.
+     * @param table Name of the table.
+     * @param rows Array of row objects.
+     */
+    batchInsert(table: string, rows: Record<string, any>[]): Promise<string>;
+
+    /**
      * Applies schema changes to the database (Migration).
      * @param table (Optional) Name of the table. If omitted, migrates ALL tables from the local schema file.
      * @param fields (Optional) New field definitions. If omitted, reads from the local schema file.

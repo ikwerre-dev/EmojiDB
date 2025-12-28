@@ -306,6 +306,68 @@ func (db *Database) Insert(tableName string, record Row) error {
 	return nil
 }
 
+func (db *Database) BulkInsert(tableName string, records []Row) error {
+	db.Mu.RLock()
+	table, ok := db.Tables[tableName]
+	db.Mu.RUnlock()
+
+	if !ok {
+		return errors.New("table not found: " + tableName)
+	}
+
+	table.Mu.Lock()
+	defer table.Mu.Unlock()
+
+	// 1. Validation Phase (All or Nothing)
+	for i, record := range records {
+		for _, field := range table.Schema.Fields {
+			val, ok := record[field.Name]
+			if !ok {
+				return fmt.Errorf("row %d: missing field: %s", i, field.Name)
+			}
+			if field.Unique {
+				if _, exists := table.UniqueIndices[field.Name][val]; exists {
+					return fmt.Errorf("row %d: unique constraint violation: %s", i, field.Name)
+				}
+				// Also check against other rows in this batch to prevent duplicates within the batch
+				for j := 0; j < i; j++ {
+					if records[j][field.Name] == val {
+						return fmt.Errorf("row %d: duplicate value in batch for field: %s", i, field.Name)
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Application Phase
+	for _, record := range records {
+		for _, field := range table.Schema.Fields {
+			if field.Unique {
+				table.UniqueIndices[field.Name][record[field.Name]] = struct{}{}
+			}
+		}
+		table.HotHeap.Rows = append(table.HotHeap.Rows, record)
+	}
+
+	// Check for auto-flush once at the end
+	if len(table.HotHeap.Rows) >= table.HotHeap.MaxRows {
+		clump := &SealedClump{
+			Rows:     table.HotHeap.Rows,
+			SealedAt: time.Now(),
+			Metadata: ClumpMetadata{
+				RowCount:      len(table.HotHeap.Rows),
+				CreatedAt:     table.HotHeap.CreatedAt,
+				SchemaVersion: table.Schema.Version,
+			},
+		}
+		table.SealedClumps = append(table.SealedClumps, clump)
+		table.HotHeap = NewHotHeap(1000)
+		go db.PersistClump(tableName, clump)
+	}
+
+	return nil
+}
+
 func (db *Database) PersistClump(tableName string, clump *SealedClump) error {
 	return storage.PersistClump(db.File, &db.Mu, tableName, clump, db.Key, crypto.Encrypt, crypto.EncodeToEmojis)
 }

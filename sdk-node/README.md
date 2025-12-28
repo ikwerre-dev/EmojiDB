@@ -78,12 +78,28 @@ await db.defineSchema('users', [
 
 ### 3. CRUD Operations
 
-#### **Insert**
+#### Insert Data
 ```javascript
-await db.insert('users', { id: 1, username: 'robinson' });
+await db.insert('users', {
+    id: 1,
+    username: 'emoji_king',
+    active: true
+});
 ```
 
-#### **Query**
+### 🚚 Batch Insert (Bulk)
+Insert multiple records in a single atomic operation for high performance.
+```javascript
+const users = [
+    { id: 2, username: 'alice' },
+    { id: 3, username: 'bob' },
+    { id: 4, username: 'charlie' }
+];
+
+await db.batchInsert('users', users);
+```
+
+### Query Data
 ```javascript
 const results = await db.query('users', { id: 1 });
 ```
