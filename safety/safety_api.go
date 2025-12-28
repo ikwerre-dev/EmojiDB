@@ -25,13 +25,18 @@ func Update(db *core.Database, tableName string, filter FilterFunc, update core.
 	table.Mu.Lock()
 	defer table.Mu.Unlock()
 
+	var toBackup []core.Row
 	for i, row := range table.HotHeap.Rows {
 		if filter(row) {
-			BackupForSafety(db, tableName, row)
+			toBackup = append(toBackup, row)
 			for k, v := range update {
 				table.HotHeap.Rows[i][k] = v
 			}
 		}
+	}
+
+	if len(toBackup) > 0 {
+		return BatchBackupForSafety(db, tableName, toBackup)
 	}
 
 	return nil
@@ -50,14 +55,19 @@ func Delete(db *core.Database, tableName string, filter FilterFunc) error {
 	defer table.Mu.Unlock()
 
 	var newRows []core.Row
+	var toBackup []core.Row
 	for _, row := range table.HotHeap.Rows {
 		if filter(row) {
-			BackupForSafety(db, tableName, row)
+			toBackup = append(toBackup, row)
 		} else {
 			newRows = append(newRows, row)
 		}
 	}
 	table.HotHeap.Rows = newRows
+
+	if len(toBackup) > 0 {
+		return BatchBackupForSafety(db, tableName, toBackup)
+	}
 
 	return nil
 }

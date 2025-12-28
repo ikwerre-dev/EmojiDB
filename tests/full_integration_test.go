@@ -94,7 +94,7 @@ func TestFullShowcase(t *testing.T) {
 	fmt.Println("4. Safety Engine: Bulk Updating 50 records")
 	err = safety.Update(db, "products", func(r core.Row) bool {
 		id, ok := r["id"].(int)
-		return ok && id >= 100 && id < 150
+		return ok && id >= 1100 && id < 1150
 	}, core.Row{"category": "updated_bulk"})
 	if err != nil {
 		t.Fatalf("Bulk update failed: %v", err)
@@ -107,7 +107,7 @@ func TestFullShowcase(t *testing.T) {
 	// 5. Single Updates (5 records)
 	start = time.Now()
 	fmt.Println("5. Safety Engine: Single Updating 5 records")
-	for i := 200; i < 205; i++ {
+	for i := 1200; i < 1205; i++ {
 		targetID := i
 		safety.Update(db, "products", func(r core.Row) bool {
 			id, _ := r["id"].(int)
@@ -124,7 +124,7 @@ func TestFullShowcase(t *testing.T) {
 	fmt.Println("6. Safety Engine: Bulk Deleting 50 records")
 	err = safety.Delete(db, "products", func(r core.Row) bool {
 		id, ok := r["id"].(int)
-		return ok && id >= 300 && id < 350
+		return ok && id >= 1300 && id < 1350
 	})
 	if err != nil {
 		t.Fatalf("Bulk delete failed: %v", err)
@@ -137,7 +137,7 @@ func TestFullShowcase(t *testing.T) {
 	// 7. Single Deletes (5 records)
 	start = time.Now()
 	fmt.Println("7. Safety Engine: Single Deleting 5 records")
-	for i := 400; i < 405; i++ {
+	for i := 1400; i < 1405; i++ {
 		targetID := i
 		safety.Delete(db, "products", func(r core.Row) bool {
 			id, _ := r["id"].(int)
@@ -207,12 +207,14 @@ func TestFullShowcase(t *testing.T) {
 		took time.Duration
 	}{"JSON Export", time.Since(start)})
 
-	fmt.Println("\nSHOWCASE SUMMARY")
+	fmt.Println("\nTEST SUMMARY")
 	fmt.Println("==================================")
 	for _, t := range timings {
-		fmt.Printf("%-25s : %dms\n", t.name, t.took.Milliseconds())
+		ms := float64(t.took.Nanoseconds()) / 1e6
+		fmt.Printf("%-25s : %.3fms\n", t.name, ms)
 	}
 	fmt.Println("----------------------------------")
-	fmt.Printf("%-25s : %dms\n", "TOTAL TIME", time.Since(totalStart).Milliseconds())
+	totalMs := float64(time.Since(totalStart).Nanoseconds()) / 1e6
+	fmt.Printf("%-25s : %.3fms\n", "TOTAL TIME", totalMs)
 	fmt.Println("==================================")
 }

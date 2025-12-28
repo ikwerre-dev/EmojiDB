@@ -19,37 +19,45 @@ type SafetyBackup struct {
 }
 
 func BackupForSafety(db *core.Database, tableName string, row core.Row) error {
-	backup := SafetyBackup{
-		Timestamp: time.Now(),
-		TableName: tableName,
-		Data:      row,
-	}
+	return BatchBackupForSafety(db, tableName, []core.Row{row})
+}
 
-	data, err := json.Marshal(backup)
-	if err != nil {
-		return err
-	}
+func BatchBackupForSafety(db *core.Database, tableName string, rows []core.Row) error {
+	var buffer string
+	for _, row := range rows {
+		backup := SafetyBackup{
+			Timestamp: time.Now(),
+			TableName: tableName,
+			Data:      row,
+		}
 
-	encrypted, err := crypto.Encrypt(data, db.Key)
-	if err != nil {
-		return err
-	}
-	emojiPayload := crypto.EncodeToEmojis(encrypted)
+		data, err := json.Marshal(backup)
+		if err != nil {
+			return err
+		}
 
-	// Store number of EMOJIS (which is len(encrypted))
-	sizeBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(sizeBytes, uint32(len(encrypted)))
-	sizeEncoded := crypto.EncodeToEmojis(sizeBytes)
+		encrypted, err := crypto.Encrypt(data, db.Key)
+		if err != nil {
+			return err
+		}
+		emojiPayload := crypto.EncodeToEmojis(encrypted)
+
+		sizeBytes := make([]byte, 4)
+		binary.LittleEndian.PutUint32(sizeBytes, uint32(len(encrypted)))
+		sizeEncoded := crypto.EncodeToEmojis(sizeBytes)
+
+		buffer += sizeEncoded + emojiPayload
+	}
 
 	db.Mu.Lock()
 	defer db.Mu.Unlock()
 
-	_, err = db.SafetyFile.Seek(0, io.SeekEnd)
+	_, err := db.SafetyFile.Seek(0, io.SeekEnd)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.SafetyFile.WriteString(sizeEncoded + emojiPayload)
+	_, err = db.SafetyFile.WriteString(buffer)
 	if err != nil {
 		return err
 	}
