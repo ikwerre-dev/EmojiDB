@@ -37,13 +37,13 @@ async function runTest() {
         // 6. Test Error Handling (Stack Trace Validation)
         try {
             console.log('6. Testing Error Stack Trace...');
-            await db.insert('users', { id: 101, username: 'duplicate_king' }); // Should fail unique constraint
+            await db.insert('users', { id: 101, username: 'duplicate_king' });
         } catch (err) {
-            console.log('✅ Error Caught:', err.message);
-            if (err.stack.includes('at runTest')) {
-                console.log('✅ Stack trace correctly points to user code!');
+            console.log('✅ Error Caught:', err); // Should look cleaner now
+            if (err.code === 'UNIQUE_CONSTRAINT') {
+                console.log('✅ Structured Error Code Verified: UNIQUE_CONSTRAINT');
             } else {
-                console.log('❌ Stack trace is missing user context:', err.stack);
+                console.log('❌ Failed to parse error structure:', err);
             }
         }
 

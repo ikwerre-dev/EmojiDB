@@ -9,15 +9,59 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Custom Error for cleaner stack traces
+// Custom Error for cleaner structured errors
 export class EmojiDBError extends Error {
     constructor(message, originalStack) {
         super(message);
         this.name = 'EmojiDBError';
-        // Stitch the original stack (from the call site) to this error
-        if (originalStack) {
-            this.stack = `${this.name}: ${this.message}\n${originalStack.substring(originalStack.indexOf('\n') + 1)}`;
+        this.code = 'UNKNOWN_ERROR';
+        this.details = {};
+
+        // Parse Known Go Errors
+        if (message.includes('table not found:')) {
+            this.code = 'TABLE_NOT_FOUND';
+            this.details = { table: message.split(': ')[1] };
+        } else if (message.includes('missing field:')) {
+            this.code = 'MISSING_FIELD';
+            this.details = { field: message.split(': ')[1] };
+        } else if (message.includes('unique constraint violation:')) {
+            this.code = 'UNIQUE_CONSTRAINT';
+            this.details = { field: message.split(': ')[1] };
+        } else if (message.includes('type mismatch')) {
+            this.code = 'TYPE_MISMATCH';
+            // "type mismatch for field: name" -> name
+            const parts = message.split(': ');
+            if (parts.length > 1) this.details = { field: parts[1] };
         }
+
+        // Hide the stack trace from default console.log if requested
+        // by overriding inspect custom or just keeping it clean.
+        // We stitch the stack for debugging if needed, but the user wants "direct error in json".
+
+        if (originalStack) {
+            // We keep the stack for debugging but maybe we don't show it by default
+            this.stack = `${this.name} [${this.code}]: ${this.message}\n${originalStack.substring(originalStack.indexOf('\n') + 1)}`;
+        }
+    }
+
+    // This method is called by Node.js console.log()
+    [Symbol.for('nodejs.util.inspect.custom')](depth, options) {
+        return {
+            error: this.name,
+            code: this.code,
+            message: this.message,
+            ...this.details
+        };
+    }
+
+    // For JSON.stringify(err)
+    toJSON() {
+        return {
+            error: this.name,
+            code: this.code,
+            message: this.message,
+            ...this.details
+        };
     }
 }
 
@@ -163,6 +207,7 @@ class EmojiDB {
     }
 
     async open(dbPath, key) {
+        this.dbPath = dbPath;
         return this.send('open', { path: dbPath, key });
     }
 
@@ -179,7 +224,52 @@ class EmojiDB {
     }
 
     async migrate(table, fields) {
-        return this.send('sync_schema', { table, fields });
+        // Case 3: Explicit Migration (table + fields provided)
+        if (table && fields) {
+            return this.send('sync_schema', { table, fields });
+        }
+
+        // Case 1 & 2: File-Based Migration
+        if (!this.dbPath) {
+            throw new Error("Database not open. Call open() first.");
+        }
+
+        // Construct path: emojidb/[basename].schema.json
+        // The Go engine forces the 'emojidb' folder.
+        const baseName = path.basename(this.dbPath);
+        const schemaPath = path.join('emojidb', baseName + '.schema.json');
+
+        if (!fs.existsSync(schemaPath)) {
+            throw new Error(`Schema file not found at ${schemaPath}. Cannot migrate from file.`);
+        }
+
+        const schemaContent = fs.readFileSync(schemaPath, 'utf8');
+        let schema;
+        try {
+            schema = JSON.parse(schemaContent);
+        } catch (e) {
+            throw new Error(`Failed to parse schema file: ${e.message}`);
+        }
+
+        // Case 2: Migrate Single Table from File
+        if (table) {
+            if (!schema[table]) {
+                throw new Error(`Table '${table}' not defined in schema file.`);
+            }
+            return this.send('sync_schema', { table, fields: schema[table].Fields });
+        }
+
+        // Case 1: Migrate All Tables from File
+        const tables = Object.keys(schema);
+        if (tables.length === 0) return "No tables to migrate.";
+
+        const results = [];
+        for (const t of tables) {
+            // We run them sequentially to be safe
+            await this.send('sync_schema', { table: t, fields: schema[t].Fields });
+            results.push(t);
+        }
+        return `Migrated ${results.length} tables: ${results.join(', ')}`;
     }
 
     async pull() {

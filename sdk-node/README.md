@@ -42,8 +42,17 @@ await db.defineSchema('users', [
 ### 🔄 Schema Evolution (Migrate & Pull)
 EmojiDB supports Prisma-like schema evolution.
 
-**Push Changes to DB (`migrate`)**  
-If you need to add fields to an existing table:
+**1. Apply Changes from Schema File (`db.migrate()`)**  
+Edit your `emojidb/*.schema.json` file manually, then run:
+```javascript
+// Syncs ALL tables in the schema file to the DB
+await db.migrate(); 
+
+// OR sync just one table from the file
+await db.migrate('users');
+```
+
+**2. Push Changes Explicitly**  
 ```javascript
 await db.migrate('users', [
     { Name: 'id',       Type: 0, Unique: true  },
@@ -52,8 +61,8 @@ await db.migrate('users', [
 ]);
 ```
 
-**Pull Schema from DB (`pull`)**  
-Force-regenerate your local `emojidb/*.schema.json` file from the actual database state. Useful for syncing or recovering lost schema files.
+**3. Pull Schema from DB (`pull`)**  
+Force-regenerate your local schema file from the actual database state.
 ```javascript
 await db.pull();
 ```

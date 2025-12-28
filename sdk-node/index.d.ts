@@ -55,10 +55,10 @@ export default class EmojiDB {
 
     /**
      * Applies schema changes to the database (Migration).
-     * @param table Name of the table.
-     * @param fields Array of new field definitions.
+     * @param table (Optional) Name of the table. If omitted, migrates ALL tables from the local schema file.
+     * @param fields (Optional) New field definitions. If omitted, reads from the local schema file.
      */
-    migrate(table: string, fields: Field[]): Promise<string>;
+    migrate(table?: string, fields?: Field[]): Promise<string>;
 
     /**
      * Forces the engine to regenerate the local schema file based on the database content (Pull).

@@ -38,16 +38,22 @@ await db.defineSchema('users', [
 ```
 
 ### 🔄 Schema Evolution (Migrate & Pull)
-**Push Changes (`migrate`)**
+**1. Migrate using Schema File**
+```javascript
+// Edits to 'emojidb/*.schema.json' are applied automatically
+await db.migrate(); 
+```
+
+**2. Push Changes Explicitly**
 ```javascript
 await db.migrate('users', [
     { Name: 'id',       Type: 0, Unique: true  },
     { Name: 'username', Type: 1, Unique: true  },
-    { Name: 'email',    Type: 1, Unique: true  } // New field
+    { Name: 'email',    Type: 1, Unique: true  } 
 ]);
 ```
 
-**Pull Schema (`pull`)**
+**3. Pull Schema (`pull`)**
 ```javascript
 await db.pull(); // Regenerates local schema files from DB state
 ```
