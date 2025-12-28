@@ -85,6 +85,10 @@ const numActive = await db.count('users', { active: true });
 
 // Drop Table (Destructive)
 await db.dropTable('old_logs');
+
+// 💾 Flush to Disk
+// Configures explicit persistence (Good logs provided)
+await db.flush('users');
 ```
 
 ### 📝 Field Types

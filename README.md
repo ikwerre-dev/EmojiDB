@@ -63,6 +63,7 @@ await db.pull(); // Regenerates local schema files
 ```javascript
 const count = await db.count('users', { active: true });
 await db.dropTable('logs');
+await db.flush('users'); // 💾 Force persist to disk
 ```
 ```javascript
 await db.pull(); // Regenerates local schema files from DB state

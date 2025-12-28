@@ -70,8 +70,13 @@ async function runTest() {
         await db.batchInsert('users', batchUsers);
         console.log('✅ Bulk Insert Successful!');
 
+        // 7. Test Flush (Persistence)
+        console.log('8. Testing Flush (Persistence)...');
+        await db.flush('users');
+        console.log('✅ Data flushed to disk successfully.');
+
         await db.close();
-        console.log('8. Connection Closed');
+        console.log('9. Connection Closed');
 
     } catch (err) {
         console.error('❌ TEST ERROR:', err.message);

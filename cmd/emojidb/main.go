@@ -279,6 +279,22 @@ func handle(req Request) {
 			sendSuccess(req.ID, "rotated")
 		}
 
+	case "flush":
+		var p struct {
+			Table string `json:"table"`
+		}
+		json.Unmarshal(req.Params, &p)
+		if db == nil {
+			sendError(req.ID, "db not open")
+			return
+		}
+		err := db.Flush(p.Table)
+		if err != nil {
+			sendError(req.ID, err.Error())
+		} else {
+			sendSuccess(req.ID, "flushed")
+		}
+
 	case "close":
 		if db != nil {
 			db.Close()

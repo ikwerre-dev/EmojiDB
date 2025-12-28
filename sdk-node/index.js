@@ -296,6 +296,13 @@ class EmojiDB {
         return this.send('drop_table', { table });
     }
 
+    async flush(table) {
+        console.log(`💾 EmojiDB: Persisting '${table}' to disk...`);
+        const res = await this.send('flush', { table });
+        console.log(`✅ EmojiDB: '${table}' persisted successfully.`);
+        return res;
+    }
+
     async update(table, match, updateData) {
         return this.send('update', { table, match, update: updateData });
     }

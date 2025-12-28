@@ -94,6 +94,13 @@ export default class EmojiDB {
     dropTable(table: string): Promise<string>;
 
     /**
+     * Manually flushes in-memory data (Hot Heap) to the disk-based Sealed Clump.
+     * Use this to ensure data persistence before stopping the application.
+     * @param table Name of the table.
+     */
+    flush(table: string): Promise<string>;
+
+    /**
      * Forces the engine to regenerate the local schema file based on the database content (Pull).
      */
     pull(): Promise<string>;
