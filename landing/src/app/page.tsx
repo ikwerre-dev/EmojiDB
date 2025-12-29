@@ -64,7 +64,7 @@ export default function Home() {
             <CodeEditor />
           </div>
           <div className="col-span-2 h-[30rem] border-b-2 border-b-white/90 flex flex-col  px-8 py-6">
-            <h3 className="font-sekuya text-3xl font-bold text-white/90 mb-6">How it Works</h3>
+            <h3 className="font-sekuya text-3xl font-bold text-white/90 mb-6">How tf does it work?</h3>
             <div className="space-y-4">
               <div className="flex gap-3">
                 <div className="flex-shrink-0 items-center text-sm font-bold">
