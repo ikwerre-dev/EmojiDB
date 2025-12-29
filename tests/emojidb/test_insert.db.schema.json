@@ -1,0 +1,17 @@
+{
+  "users": {
+    "Version": 1,
+    "Fields": [
+      {
+        "Name": "id",
+        "Type": 0,
+        "Unique": false
+      },
+      {
+        "Name": "name",
+        "Type": 1,
+        "Unique": false
+      }
+    ]
+  }
+}
